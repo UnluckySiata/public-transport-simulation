@@ -1,4 +1,14 @@
+mod common;
+mod grid;
+mod vehicle;
+
 use std::time::Instant;
+
+use crate::{
+    common::{Direction, Position},
+    grid::Grid,
+    vehicle::VehicleType,
+};
 
 fn simulation_loop() {
     const FIXED_DT: f32 = 1.0 / 2.0;
@@ -25,5 +35,6 @@ fn simulation_loop() {
 }
 
 fn main() {
-    simulation_loop();
+    let mut g = Grid::new(8);
+    g.create_vehicle(Position { x: 4, y: 4 }, VehicleType::Bus, Direction::North);
 }
