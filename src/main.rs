@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+mod graph;
+mod map;
+mod node;
+
 use std::time::Instant;
 
 fn simulation_loop() {
