@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 
-use std::mem::swap;
-
-use crate::node::{NodeVariant, Node};
+use crate::node::Node;
 
 struct Graph {
     n: usize,
@@ -20,23 +18,5 @@ impl Graph {
             initial_nodes: nodes.clone(),
             nodes,
         }
-    }
-
-    pub fn simulation_iter(&mut self) {
-        for (index, node) in self.nodes.iter_mut().enumerate() {
-            match node.variant {
-                v @ NodeVariant::Bus(line) => {
-                    self.node_progression[line.next_node_index].variant = v;
-                },
-                v @ NodeVariant::Tram(line) => {
-                    self.node_progression[line.next_node_index].variant = v;
-                },
-                // todo
-                v => {
-                    self.node_progression[index].variant = v;
-                }
-            }
-        }
-        swap(&mut self.nodes, &mut self.node_progression);
     }
 }
