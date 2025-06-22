@@ -76,10 +76,18 @@ impl Node {
             return;
         }
 
-        if rand::random_bool(sim_consts::JAM_PROBABILITY) {
-            self.jammed = true;
-            self.remaining_jam_time = rand::random_range(0.0..sim_consts::JAM_MAX_TIME);
+        if !rand::random_bool(sim_consts::JAM_PROBABILITY) {
+            return;
         }
+
+        let jam_time = rand::random_range(0.0..sim_consts::JAM_MAX_TIME - sim_consts::JAM_BASE_TIME);
+
+        if jam_time < sim_consts::JAM_BASE_TIME {
+            return;
+        }
+
+        self.jammed = true;
+        self.remaining_jam_time = jam_time + sim_consts::JAM_BASE_TIME;
     }
     pub fn can_move_into(&self) -> bool {
         let no_traffic_restriction = match self.node_variant {
