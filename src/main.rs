@@ -11,6 +11,7 @@ use graph::Graph;
 
 fn simulation_loop() {
     let mut accumulator: f64 = 0.0;
+    let mut debug_accumulator: f64 = 0.0;
     let mut previous = Instant::now();
 
     let nodes = Vec::new();
@@ -27,11 +28,17 @@ fn simulation_loop() {
             frame_time = sim_consts::MAX_FRAME_TIME;
         }
         accumulator += frame_time;
+        debug_accumulator += frame_time;
 
         while accumulator >= sim_consts::FIXED_DT {
             accumulator -= sim_consts::FIXED_DT;
             graph.simulation_iter(frame_time);
-            println!("ft: {frame_time}");
+            // println!("ft: {frame_time}");
+        }
+
+        if debug_accumulator >= sim_consts::DEBUG_PRINT_TIME {
+            debug_accumulator = 0.0;
+            println!("Graph state: {graph:#?}");
         }
     }
 }

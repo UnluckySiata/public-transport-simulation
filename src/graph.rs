@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::node::{Node, NodeVariant, Vehicle};
 
+#[derive(Debug)]
 pub struct Graph {
     n: usize,
     vehicles: BTreeMap<usize, Vehicle>,

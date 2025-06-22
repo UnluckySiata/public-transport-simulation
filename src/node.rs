@@ -2,32 +2,32 @@
 
 use crate::{sim_consts, map::MapPosition};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct LineState {
     pub number: u32,
     pub next_node_index: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vehicle {
     pub line: LineState,
     pub to_move: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TransportVariant {
     Bus,
     Tram,
 }
 
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq ,Debug)]
 pub enum LightsVariant {
     Red,
     Green,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TrafficLights {
     pub variant: LightsVariant,
     time_until_change: f64,
@@ -47,14 +47,14 @@ impl TrafficLights {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum NodeVariant {
     Regular,
     TrafficLights(TrafficLights),
     Stop,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Node {
     pub transport_variant: TransportVariant,
     pub node_variant: NodeVariant,
