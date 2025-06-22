@@ -1,38 +1,96 @@
 #![allow(dead_code)]
 
-use crate::map::MapPosition;
+use crate::{sim_consts, map::MapPosition};
 
 #[derive(Clone, Copy)]
-struct LineState {
-    number: u32,
-    next_node_index: usize,
+pub struct LineState {
+    pub number: u32,
+    pub next_node_index: usize,
 }
 
 #[derive(Clone, Copy)]
-struct Bus {
-    line: LineState,
+pub struct Vehicle {
+    pub line: LineState,
+    pub to_move: bool,
 }
 
 #[derive(Clone, Copy)]
-struct Tram {
-    line: LineState,
+pub enum TransportVariant {
+    Bus,
+    Tram,
 }
 
-#[derive(Clone, Copy)]
-enum NodeVariant {
-    Bus(Option<Bus>),
-    Tram(Option<Tram>),
-}
 
-#[derive(Clone, Copy)]
-enum TrafficLights {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LightsVariant {
     Red,
     Green,
 }
 
 #[derive(Clone, Copy)]
+pub struct TrafficLights {
+    pub variant: LightsVariant,
+    time_until_change: f64,
+}
+
+impl TrafficLights {
+    pub fn iter_and_change(&mut self, elapsed_time: f64) -> bool {
+        if self.time_until_change <= 0.0 {
+            self.time_until_change = sim_consts::LIGHT_CYCLE_SECONDS;
+
+            return true;
+        }
+
+        self.time_until_change -= elapsed_time;
+
+        false
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum NodeVariant {
+    Regular,
+    TrafficLights(TrafficLights),
+    Stop,
+}
+
+#[derive(Clone, Copy)]
 pub struct Node {
-    variant: NodeVariant,
-    traffic_lights: Option<TrafficLights>,
+    pub transport_variant: TransportVariant,
+    pub node_variant: NodeVariant,
+    pub occupied: bool,
+    jammed: bool,
+    remaining_jam_time: f64,
     position: MapPosition,
+}
+
+impl Node {
+    pub fn update_state(&mut self, elapsed_time: f64) {
+        if self.jammed {
+            self.remaining_jam_time -= elapsed_time;
+
+            if self.remaining_jam_time <= 0.0 {
+                self.jammed = false;
+                self.remaining_jam_time = 0.0;
+            }
+            return;
+        }
+
+        if rand::random_bool(sim_consts::JAM_PROBABILITY) {
+            self.jammed = true;
+            self.remaining_jam_time = rand::random_range(0.0..sim_consts::JAM_MAX_TIME);
+        }
+    }
+    pub fn can_move_into(&self) -> bool {
+        let no_traffic_restriction = match self.node_variant {
+            NodeVariant::Regular => true,
+            NodeVariant::Stop => true,
+
+            NodeVariant::TrafficLights(traffic_lights) => {
+                traffic_lights.variant == LightsVariant::Green
+            }
+        };
+
+        no_traffic_restriction && !self.jammed && !self.occupied
+    }
 }
