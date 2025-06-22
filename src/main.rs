@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 mod graph;
 mod map;
+mod mock;
 mod node;
 mod sim_consts;
 
