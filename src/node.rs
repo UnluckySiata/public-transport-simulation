@@ -1,16 +1,10 @@
-#![allow(dead_code)]
-
+use crate::line::LineState;
 use crate::sim_consts;
 
-#[derive(Clone, Copy, Debug)]
-pub struct LineState {
-    pub number: u32,
-    pub next_node_index: usize,
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Vehicle {
-    pub line: LineState,
+    line: LineState,
+    curr_dist_traveled: f64,
     pub to_move: bool,
 }
 
@@ -18,8 +12,26 @@ impl Vehicle {
     pub fn new(line: LineState) -> Self {
         Self {
             line,
+            curr_dist_traveled: 0.0,
             to_move: false,
         }
+    }
+    pub fn progress(&mut self, elapsed_time: f64) -> bool {
+        self.curr_dist_traveled += sim_consts::VEHICLE_SPEED_MS * elapsed_time;
+
+        if self.curr_dist_traveled >= sim_consts::METERS_BETWEEN_NODES {
+            self.curr_dist_traveled = 0.0;
+            self.line.progress();
+            true
+        } else {
+            false
+        }
+    }
+    pub fn next_node_index(&mut self) -> usize {
+        self.line.curr_node_index
+    }
+    pub fn line_number(&self) -> u32 {
+        self.line.number
     }
 }
 
@@ -48,7 +60,7 @@ impl TrafficLights {
             time_until_change: sim_consts::LIGHT_CYCLE_SECONDS,
         }
     }
-    
+
     pub fn iter_and_change(&mut self, elapsed_time: f64) -> bool {
         if self.time_until_change <= 0.0 {
             self.time_until_change = sim_consts::LIGHT_CYCLE_SECONDS;
@@ -117,6 +129,8 @@ impl Node {
         self.jammed = true;
         self.remaining_jam_time = jam_time + sim_consts::JAM_BASE_TIME;
     }
+
+    // TODO: handle two-way traffic
     pub fn can_move_into(&self) -> bool {
         let no_traffic_restriction = match self.node_variant {
             NodeVariant::Regular => true,

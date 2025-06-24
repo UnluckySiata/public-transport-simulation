@@ -1,24 +1,21 @@
 #![allow(dead_code)]
 mod graph;
+mod line;
 mod map;
 mod mock;
 mod node;
 mod sim_consts;
 
-use std::collections::BTreeMap;
 use std::time::Instant;
 
-use graph::Graph;
+use mock::mock_one_line;
 
 fn simulation_loop() {
     let mut accumulator: f64 = 0.0;
     let mut debug_accumulator: f64 = 0.0;
     let mut previous = Instant::now();
 
-    let nodes = Vec::new();
-    let vehicles = BTreeMap::new();
-
-    let mut graph = Graph::new(nodes, vehicles);
+    let mut graph = mock_one_line();
 
     loop {
         let now = Instant::now();
@@ -33,13 +30,13 @@ fn simulation_loop() {
 
         while accumulator >= sim_consts::FIXED_DT {
             accumulator -= sim_consts::FIXED_DT;
-            graph.simulation_iter(frame_time);
+            graph.simulation_iter(sim_consts::FIXED_DT);
             // println!("ft: {frame_time}");
         }
 
         if debug_accumulator >= sim_consts::DEBUG_PRINT_TIME {
             debug_accumulator = 0.0;
-            println!("Graph state: {graph:#?}");
+            println!("Graph state: {g}", g = graph.debug_repr());
         }
     }
 }
