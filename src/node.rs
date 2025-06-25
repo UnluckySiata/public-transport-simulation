@@ -19,7 +19,7 @@ impl Vehicle {
     pub fn progress(&mut self, elapsed_time: f64) -> bool {
         self.curr_dist_traveled += sim_consts::VEHICLE_SPEED_MS * elapsed_time;
 
-        if self.curr_dist_traveled >= sim_consts::METERS_BETWEEN_NODES {
+        if self.curr_dist_traveled >= self.line.dist_to_next_node {
             self.curr_dist_traveled = 0.0;
             self.line.progress();
             true
@@ -50,20 +50,22 @@ pub enum LightsVariant {
 #[derive(Clone, Copy, Debug)]
 pub struct TrafficLights {
     pub variant: LightsVariant,
+    light_cycle_time: f64,
     time_until_change: f64,
 }
 
 impl TrafficLights {
-    pub fn new(variant: LightsVariant) -> Self {
+    pub fn new(variant: LightsVariant, time_until_change: f64) -> Self {
         Self {
             variant,
-            time_until_change: sim_consts::LIGHT_CYCLE_SECONDS,
+            light_cycle_time: time_until_change,
+            time_until_change,
         }
     }
 
     pub fn iter_and_change(&mut self, elapsed_time: f64) -> bool {
         if self.time_until_change <= 0.0 {
-            self.time_until_change = sim_consts::LIGHT_CYCLE_SECONDS;
+            self.time_until_change = self.light_cycle_time;
 
             return true;
         }
@@ -87,6 +89,7 @@ pub struct Node {
     pub node_variant: NodeVariant,
     pub occupied: bool,
     jammed: bool,
+    jam_probability: f64,
     remaining_jam_time: f64,
 }
 
@@ -95,12 +98,14 @@ impl Node {
         transport_variant: TransportVariant,
         node_variant: NodeVariant,
         occupied: bool,
+        jam_probability: f64,
     ) -> Self {
         Self {
             transport_variant,
             node_variant,
             occupied,
             jammed: false,
+            jam_probability,
             remaining_jam_time: 0.0,
         }
     }
@@ -115,7 +120,7 @@ impl Node {
             return;
         }
 
-        if !rand::random_bool(sim_consts::JAM_PROBABILITY) {
+        if !rand::random_bool(self.jam_probability) {
             return;
         }
 
