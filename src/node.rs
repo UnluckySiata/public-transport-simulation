@@ -1,4 +1,4 @@
-use crate::line::LineState;
+use crate::line::{LineState, RoadSide};
 use crate::sim_consts;
 
 #[derive(Clone, Debug)]
@@ -32,6 +32,9 @@ impl Vehicle {
     }
     pub fn line_number(&self) -> u32 {
         self.line.number
+    }
+    pub fn road_side(&self) -> RoadSide {
+        self.line.current_road_side()
     }
 }
 
@@ -87,7 +90,8 @@ pub enum NodeVariant {
 pub struct Node {
     pub transport_variant: TransportVariant,
     pub node_variant: NodeVariant,
-    pub occupied: bool,
+    pub occupied_left: bool,
+    pub occupied_right: bool,
     jammed: bool,
     jam_probability: f64,
     remaining_jam_time: f64,
@@ -97,13 +101,15 @@ impl Node {
     pub fn new(
         transport_variant: TransportVariant,
         node_variant: NodeVariant,
-        occupied: bool,
+        occupied_left: bool,
+        occupied_right: bool,
         jam_probability: f64,
     ) -> Self {
         Self {
             transport_variant,
             node_variant,
-            occupied,
+            occupied_left,
+            occupied_right,
             jammed: false,
             jam_probability,
             remaining_jam_time: 0.0,
@@ -135,8 +141,7 @@ impl Node {
         self.remaining_jam_time = jam_time + sim_consts::JAM_BASE_TIME;
     }
 
-    // TODO: handle two-way traffic
-    pub fn can_move_into(&self) -> bool {
+    pub fn can_move_into(&self, road_side: RoadSide) -> bool {
         let no_traffic_restriction = match self.node_variant {
             NodeVariant::Regular => true,
             NodeVariant::Stop => true,
@@ -146,6 +151,11 @@ impl Node {
             }
         };
 
-        no_traffic_restriction && !self.jammed && !self.occupied
+        let occupied = match road_side {
+            RoadSide::Left => self.occupied_left,
+            RoadSide::Right => self.occupied_right,
+        };
+
+        no_traffic_restriction && !self.jammed && !occupied
     }
 }
