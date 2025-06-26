@@ -1,8 +1,6 @@
 use chrono::NaiveTime;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use serde_json::Value;
-use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -14,6 +12,7 @@ struct NeighbourStop {
     stop_id: String,
     stop_name: String,
     lines: Vec<String>,
+    transport_type: String
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -54,6 +53,7 @@ struct StopTime {
 struct Route {
     route_id: String,
     route_short_name: String,
+    route_type: u8,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -207,6 +207,7 @@ fn creating_bus_stop_data() -> Result<(), Box<dyn Error>> {
     }
 
     let mut enriched_stops: Vec<EnrichedStop> = Vec::new();
+
     for stop in &bus_schedules {
         let neighbours = stop_neighbours
             .get(&stop.stop_id)
@@ -218,18 +219,37 @@ fn creating_bus_stop_data() -> Result<(), Box<dyn Error>> {
 
         for neighbour_id in neighbours {
             if let Some(name) = stop_id_to_stop_name.get(&neighbour_id) {
-                let lines = stop_id_to_lines
+                let lines_set = stop_id_to_lines
                     .get(&neighbour_id)
                     .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .collect();
+                    .unwrap_or_default();
+
+                let lines: Vec<String> = lines_set.iter().cloned().collect();
+
+                // Ustalenie typu transportu na podstawie linii
+                let mut transport_types = HashSet::new();
+
+                for line in &lines {
+                    if let Some(route) = routes.values().find(|r| &r.route_short_name == line) {
+                        transport_types.insert(transport_type_from_route_type(route.route_type));
+                    }
+                }
+
+                let transport_type = if transport_types.len() == 1 {
+                    transport_types.into_iter().next().unwrap().to_string()
+                } else if transport_types.is_empty() {
+                    "unknown".to_string()
+                } else {
+                    "mixed".to_string()
+                };
 
                 neighbour_stops.push(NeighbourStop {
                     stop_id: neighbour_id.clone(),
                     stop_name: name.clone(),
                     lines,
+                    transport_type,
                 });
+
                 reachable_stops.push(name.clone());
             }
         }
@@ -243,8 +263,21 @@ fn creating_bus_stop_data() -> Result<(), Box<dyn Error>> {
 
     let file = File::create("enriched_stops.json")?;
     serde_json::to_writer_pretty(file, &enriched_stops)?;
-
     Ok(())
+}
+
+fn transport_type_from_route_type(route_type: u8) -> &'static str {
+    match route_type {
+        0 => "tram",
+        1 => "metro",
+        2 => "rail",
+        3 => "bus",
+        4 => "ferry",
+        5 => "cable_car",
+        6 => "gondola",
+        7 => "monorail",
+        _ => "unknown",
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -284,11 +317,9 @@ fn reading_routes_csv(
     let mut rdr = csv::Reader::from_path(routes_file_path)?;
     let mut routes: HashMap<String, Route> = HashMap::new();
 
-    println!("route_ids: {:?}", route_ids);
     for result in rdr.deserialize() {
         let route: Route = result?;
         if route_ids.contains(&route.route_id) {
-            println!("MATCH: {}", route.route_short_name.clone());
             routes.insert(route.route_id.clone(), route);
         }
     }
