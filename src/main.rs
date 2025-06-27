@@ -53,8 +53,29 @@ fn simulation_loop() {
 
 fn main() {
     // simulation_loop();
-    if let Err(err) = creating_bus_stop_data() {
-        println!("{}", err);
+    let args = match get_args() {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("Błąd: {}", e);
+            process::exit(1);
+        }
+    };
+    
+    let (
+        bus_stops_file_path,
+        coordinates_file_path,
+        stop_times_file_path,
+        trips_file_path,
+        routes_file_path,
+    ) = args;
+
+    if let Err(err) = creating_bus_stop_data(
+        bus_stops_file_path,
+        coordinates_file_path,
+        stop_times_file_path,
+        trips_file_path,
+        routes_file_path,
+    ) {
+        eprintln!("Błąd: {}", err);
         process::exit(1);
-    }
-}
+    }}
