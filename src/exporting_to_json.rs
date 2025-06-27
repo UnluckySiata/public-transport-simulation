@@ -1,4 +1,5 @@
-use crate::{structs};
+use crate::structs;
+use crate::structs::BusStop;
 use chrono::NaiveTime;
 use serde_json;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -13,8 +14,8 @@ pub fn creating_bus_stop_data(
     trips_file_path: OsString,
     routes_file_path: OsString,
 ) -> Result<(), Box<dyn Error>> {
-
-    let bus_schedules = create_initial_bus_schedules(bus_stops_file_path, coordinates_file_path)?;
+    let bus_stops = reading_bus_stops_csv(bus_stops_file_path, coordinates_file_path)?;
+    let bus_schedules = create_initial_bus_schedules(&bus_stops)?;
     let (stop_times, trips, routes) = read_schedule_dependencies(
         &bus_schedules,
         stop_times_file_path,
@@ -25,23 +26,25 @@ pub fn creating_bus_stop_data(
     let enriched_schedules = enrich_schedules(bus_schedules, &stop_times, &trips, &routes)?;
     save_bus_schedule(&enriched_schedules)?;
 
-    let enriched_stops = create_enriched_stops(&enriched_schedules, &stop_times, &trips, &routes);
+    let enriched_stops = enrich_bus_stops(bus_stops, &enriched_schedules, &stop_times, &routes);
     save_enriched_stops(&enriched_stops)?;
 
     Ok(())
 }
 
-fn create_enriched_stops(
+fn enrich_bus_stops(
+    mut bus_stops: HashMap<String, BusStop>,
     schedules: &Vec<structs::BusStopSchedule>,
     stop_times: &Vec<structs::StopTime>,
-    trips: &HashMap<String, structs::Trip>,
     routes: &HashMap<String, structs::Route>,
-) -> Vec<structs::EnrichedStop> {
+) -> Vec<BusStop> {
     let stop_id_to_name: HashMap<_, _> = schedules
         .iter()
         .map(|s| (s.stop_id.clone(), s.stop_name.clone()))
         .collect();
 
+    // zbiera wszystkie linie dla danego przystanku, patrzy na schedule danego bus_stopu i robi mapę
+    // gdzie kluczem jest bus_id, a wartością lista lini zatrzymujących się przy danym przystanku
     let stop_id_to_lines: HashMap<String, HashSet<String>> = schedules
         .iter()
         .filter_map(|s| {
@@ -51,12 +54,19 @@ fn create_enriched_stops(
         })
         .collect();
 
-    let mut trip_stop_sequences: HashMap<String, Vec<String>> = HashMap::new();
-    for st in stop_times {
+    // mapa przystanków (bus_id) jakich dany autobus odwiedza podczas przejazdy (tripu)
+    // stop_times ma listę nieposortowanych przystanków które odwiedza,
+    // mogę zaagregować dla każdego trip_id wszystkie przystanki w odpowiedniej kolejności po stop_sequence
+    let mut trip_stop_sequences: HashMap<String, Vec<(u16, String)>> = HashMap::new();
+    for stop_time in stop_times {
         trip_stop_sequences
-            .entry(st.trip_id.clone())
+            .entry(stop_time.trip_id.clone())
             .or_default()
-            .push(st.stop_id.clone());
+            .push((stop_time.stop_sequence.clone(), stop_time.stop_id.clone()));
+    }
+
+    for trip in trip_stop_sequences.values_mut() {
+        trip.sort_by_key(|(seq, _)| *seq);
     }
 
     let mut stop_neighbours: HashMap<String, HashSet<String>> = HashMap::new();
@@ -64,79 +74,76 @@ fn create_enriched_stops(
         for window in seq.windows(2) {
             if let [a, b] = &window[..] {
                 stop_neighbours
-                    .entry(a.clone())
+                    .entry(a.1.clone())
                     .or_default()
-                    .insert(b.clone());
+                    .insert(b.1.clone());
                 stop_neighbours
-                    .entry(b.clone())
+                    .entry(b.1.clone())
                     .or_default()
-                    .insert(a.clone());
+                    .insert(a.1.clone());
             }
         }
     }
 
-    let mut enriched = Vec::new();
     for stop in schedules {
-        let neighbours = stop_neighbours
-            .get(&stop.stop_id)
-            .cloned()
-            .unwrap_or_default();
+        if let Some(bus_stop) = bus_stops.get_mut(&stop.stop_id) {
+            let neighbours = stop_neighbours
+                .get(&stop.stop_id)
+                .cloned()
+                .unwrap_or_default();
 
-        let mut neighbour_stops = Vec::new();
-        let mut reachable_stops = Vec::new();
+            let mut neighbour_stops = Vec::new();
+            let mut reachable_stops = Vec::new();
 
-        for neighbour_id in neighbours {
-            if let Some(name) = stop_id_to_name.get(&neighbour_id) {
-                let lines = stop_id_to_lines
-                    .get(&neighbour_id)
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .collect::<Vec<_>>();
+            for neighbour_id in neighbours {
+                if let Some(name) = stop_id_to_name.get(&neighbour_id) {
+                    let lines = stop_id_to_lines
+                        .get(&neighbour_id)
+                        .cloned()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect::<Vec<_>>();
 
-                let transport_types: HashSet<_> = lines
-                    .iter()
-                    .filter_map(|line| {
-                        routes
-                            .values()
-                            .find(|r| &r.route_short_name == line)
-                            .map(|r| transport_type_from_route_type(r.route_type))
-                    })
-                    .collect();
+                    let transport_types: HashSet<_> = lines
+                        .iter()
+                        .filter_map(|line| {
+                            routes
+                                .values()
+                                .find(|r| &r.route_short_name == line)
+                                .map(|r| transport_type_from_route_type(r.route_type))
+                        })
+                        .collect();
 
-                let transport_type = match transport_types.len() {
-                    1 => transport_types.into_iter().next().unwrap(),
-                    0 => "unknown",
-                    _ => "mixed",
-                };
+                    let transport_type = match transport_types.len() {
+                        1 => transport_types.into_iter().next().unwrap(),
+                        0 => "unknown",
+                        _ => "mixed",
+                    };
 
-                neighbour_stops.push(structs::NeighbourStop {
-                    stop_id: neighbour_id.clone(),
-                    stop_name: name.clone(),
-                    lines,
-                    transport_type: transport_type.parse().unwrap(),
-                });
-                reachable_stops.push(name.clone());
+                    neighbour_stops.push(structs::NeighbourStop {
+                        stop_id: neighbour_id.clone(),
+                        stop_name: name.clone(),
+                        lines,
+                        transport_type: transport_type.parse().unwrap(),
+                    });
+
+                    reachable_stops.push(name.clone());
+                }
             }
-        }
 
-        enriched.push(structs::EnrichedStop {
-            stop_name: stop.stop_name.clone(),
-            neighbour_stops,
-            reachable_stops,
-        });
+            bus_stop.neighbour_stops = Option::from(neighbour_stops);
+            bus_stop.reachable_stops = Option::from(reachable_stops);
+        }
     }
 
-    enriched
+    bus_stops.into_values().collect()
 }
 
 fn create_initial_bus_schedules(
-    bus_stops_file_path: OsString,
-    coordinates_file_path: OsString,
+    mut bus_stops: &HashMap<String, BusStop>,
 ) -> Result<Vec<structs::BusStopSchedule>, Box<dyn Error>> {
-    let bus_stops = reading_bus_stops_csv(bus_stops_file_path, coordinates_file_path)?;
     let schedules = bus_stops
-        .iter()
+        .values()
         .map(|bus_stop| structs::BusStopSchedule {
             stop_id: bus_stop.stop_id.clone(),
             stop_name: bus_stop.stop_name.clone(),
@@ -269,20 +276,20 @@ fn reading_trips_csv(
 fn reading_bus_stops_csv(
     bus_stops_file_path: OsString,
     coordinates_file_path: OsString,
-) -> Result<Vec<structs::BusStop>, Box<dyn Error>> {
+) -> Result<HashMap<String, BusStop>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(bus_stops_file_path)?;
     let (start_lat, start_lon, end_lat, end_lon) = reading_coordinates(coordinates_file_path)?;
 
-    let mut bus_stops: Vec<structs::BusStop> = Vec::new();
+    let mut bus_stops: HashMap<String, BusStop> = HashMap::new();
     for result in rdr.deserialize() {
-        let bus_stop: structs::BusStop = result?;
+        let bus_stop: BusStop = result?;
 
         if bus_stop.stop_lat <= start_lat
             && bus_stop.stop_lat >= end_lat
             && bus_stop.stop_lon >= start_lon
             && bus_stop.stop_lon <= end_lon
         {
-            bus_stops.push(bus_stop);
+            bus_stops.insert(bus_stop.stop_id.clone(), bus_stop);
         }
     }
 
@@ -325,7 +332,7 @@ fn reading_coordinates(file_path: OsString) -> Result<(f64, f64, f64, f64), Box<
     ))
 }
 
-fn save_enriched_stops(stops: &Vec<structs::EnrichedStop>) -> Result<(), Box<dyn Error>> {
+fn save_enriched_stops(stops: &Vec<BusStop>) -> Result<(), Box<dyn Error>> {
     let file = File::create("outputs/enriched_stops.json")?;
     serde_json::to_writer_pretty(file, stops)?;
     Ok(())
