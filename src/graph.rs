@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use egui::Pos2;
+
 use crate::{
-    line::RoadSide,
-    node::{Node, NodeVariant, Vehicle},
-    time::Time,
+    line::RoadSide, map::{MapNode, Visuals}, node::{Node, NodeVariant, Vehicle}, time::Time
 };
 
 #[derive(Debug)]
@@ -85,30 +85,30 @@ impl Graph {
         }
     }
 
-    // TODO: improve or just create gui
-    pub fn debug_repr(&self) -> String {
-        let repr = (0..self.n)
-            .map(|i| {
-                let lk = &(i, RoadSide::Left);
-                let rk = &(i, RoadSide::Right);
+    pub fn generate_visuals(&self) -> Visuals {
+        let mut map_nodes = Vec::with_capacity(self.n);
 
-                let left = if self.vehicles.contains_key(lk) {
-                    format!("{}", self.vehicles[lk].line_number())
-                } else {
-                    "o".to_owned()
-                };
+        for (i, node) in self.nodes.iter().enumerate() {
+            let kl = &(i, RoadSide::Left);
+            let kr = &(i, RoadSide::Right);
 
-                let right = if self.vehicles.contains_key(rk) {
-                    format!("{}", self.vehicles[rk].line_number())
-                } else {
-                    "o".to_owned()
-                };
+            let vehicle_line_left = if self.vehicles.contains_key(kl) {
+                self.vehicles[kl].line_number()
+            } else {
+                0
+            };
+            let vehicle_line_right = if self.vehicles.contains_key(kr) {
+                self.vehicles[kr].line_number()
+            } else {
+                0
+            };
 
-                format!("{left}|{right}")
-            })
-            .collect::<Vec<String>>()
-            .join(" ");
+            let pos = Pos2 { x: 400.0 + (i as f32) * 80.0, y: 200.0 };
 
-        repr
+            let map_node = MapNode::new(pos, node.jammed, node.transport_variant, vehicle_line_left, vehicle_line_right);
+            map_nodes.push(map_node);
+        }
+
+        Visuals { nodes: map_nodes }
     }
 }

@@ -38,7 +38,7 @@ impl Vehicle {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportVariant {
     Bus,
     Tram,
@@ -92,9 +92,9 @@ pub struct Node {
     pub node_variant: NodeVariant,
     pub occupied_left: bool,
     pub occupied_right: bool,
-    jammed: bool,
+    pub jammed: bool,
     jam_probability: f64,
-    remaining_jam_time: f64,
+    remaining_cycle_time: f64,
 }
 
 impl Node {
@@ -112,33 +112,30 @@ impl Node {
             occupied_right,
             jammed: false,
             jam_probability,
-            remaining_jam_time: 0.0,
+            remaining_cycle_time: 0.0,
         }
     }
     pub fn update_state(&mut self, elapsed_time: f64) {
+        if self.transport_variant == TransportVariant::Tram {
+            return;
+        };
+
+        self.remaining_cycle_time -= elapsed_time;
+        if self.remaining_cycle_time > 0.0 {
+            return;
+        }
+
         if self.jammed {
-            self.remaining_jam_time -= elapsed_time;
-
-            if self.remaining_jam_time <= 0.0 {
-                self.jammed = false;
-                self.remaining_jam_time = 0.0;
-            }
+            self.jammed = false;
             return;
         }
 
-        if !rand::random_bool(self.jam_probability) {
-            return;
+        self.remaining_cycle_time =
+            rand::random_range(sim_consts::ROAD_BASE_CYCLE..sim_consts::ROAD_MAX_CYCLE);
+
+        if rand::random_bool(self.jam_probability) {
+            self.jammed = true;
         }
-
-        let jam_time =
-            rand::random_range(0.0..sim_consts::JAM_MAX_TIME - sim_consts::JAM_BASE_TIME);
-
-        if jam_time < sim_consts::JAM_BASE_TIME {
-            return;
-        }
-
-        self.jammed = true;
-        self.remaining_jam_time = jam_time + sim_consts::JAM_BASE_TIME;
     }
 
     pub fn can_move_into(&self, road_side: RoadSide) -> bool {

@@ -1,51 +1,47 @@
 #![allow(dead_code)]
 mod graph;
+mod gui;
 mod line;
 mod map;
 mod mock;
-mod time;
 mod node;
 mod sim_consts;
+mod time;
 
-use std::time::Instant;
+use crate::{graph::Graph, mock::mock_one_line, time::Time};
 
-use mock::mock_one_line;
-use time::Time;
+pub struct Simulation {
+    pub accumulator: f64,
+    pub debug_accumulator: f64,
+    pub speed: f64,
+    pub paused: bool,
+    pub done: bool,
+    pub time: Time,
+    pub graph: Graph,
+}
 
-fn simulation_loop() {
-    let mut accumulator: f64 = 0.0;
-    let mut debug_accumulator: f64 = 0.0;
-    let mut previous = Instant::now();
+fn run_simulation() -> eframe::Result<()> {
+    let graph = mock_one_line();
 
-    let mut graph = mock_one_line();
+    let sim = Simulation {
+        accumulator: 0.0,
+        debug_accumulator: 0.0,
+        speed: 1.0,
+        paused: false,
+        done: false,
+        time: Time::new(4, 30, 0),
+        graph,
+    };
 
-    let time_step = sim_consts::SIM_SPEED_MULTIPLIER * sim_consts::FIXED_DT;
-    let sim_time = Time::new(4, 30, 0);
+    let native_options = eframe::NativeOptions::default();
 
-    loop {
-        let now = Instant::now();
-        let mut frame_time = (now - previous).as_secs_f64();
-        previous = now;
-
-        if frame_time > sim_consts::MAX_FRAME_TIME {
-            frame_time = sim_consts::MAX_FRAME_TIME;
-        }
-        accumulator += frame_time;
-        debug_accumulator += frame_time;
-
-        while accumulator >= sim_consts::FIXED_DT {
-            accumulator -= sim_consts::FIXED_DT;
-            graph.simulation_iter(time_step, &sim_time);
-            // println!("ft: {frame_time}");
-        }
-
-        if debug_accumulator >= sim_consts::DEBUG_PRINT_TIME {
-            debug_accumulator = 0.0;
-            println!("Graph state: {g}", g = graph.debug_repr());
-        }
-    }
+    eframe::run_native(
+        "Public transport simulation",
+        native_options,
+        Box::new(move |_| Ok(Box::new(sim))),
+    )
 }
 
 fn main() {
-    simulation_loop();
+    let _ = run_simulation();
 }
