@@ -1,11 +1,12 @@
 use crate::structs;
-use crate::structs::BusStop;
+use crate::structs::{BusStop, NeighbourStop};
 use chrono::NaiveTime;
 use serde_json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::{error::Error, ffi::OsString, fs::File};
+use serde::{Deserialize, Serialize};
 
 pub fn creating_bus_stop_data(
     bus_stops_file_path: OsString,
@@ -282,13 +283,27 @@ fn reading_bus_stops_csv(
 
     let mut bus_stops: HashMap<String, BusStop> = HashMap::new();
     for result in rdr.deserialize() {
-        let bus_stop: BusStop = result?;
+        let mut bus_stop: BusStop = result?;
 
         if bus_stop.stop_lat <= start_lat
             && bus_stop.stop_lat >= end_lat
             && bus_stop.stop_lon >= start_lon
             && bus_stop.stop_lon <= end_lon
         {
+            let (x, y) = scale_coordinates_to_gui(
+                bus_stop.stop_lat,
+                bus_stop.stop_lon,
+                start_lat,
+                start_lon,
+                end_lat,
+                end_lon,
+                1280.0,
+                720.0,
+            );
+
+            bus_stop.x = Some(x);
+            bus_stop.y = Some(y);
+
             bus_stops.insert(bus_stop.stop_id.clone(), bus_stop);
         }
     }
@@ -357,3 +372,19 @@ fn transport_type_from_route_type(route_type: u8) -> &'static str {
         _ => "unknown",
     }
 }
+
+fn scale_coordinates_to_gui(
+    lat: f64,
+    lon: f64,
+    start_lat: f64,
+    start_lon: f64,
+    end_lat: f64,
+    end_lon: f64,
+    width: f64,
+    height: f64,
+) -> (f64, f64) {
+    let x = ((lon - start_lon) / (end_lon - start_lon)) * width;
+    let y = ((start_lat - lat) / (start_lat - end_lat)) * height;
+    (x, y)
+}
+

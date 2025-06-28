@@ -11,6 +11,10 @@ pub struct BusStop {
     pub(crate) stop_desc: String,
     pub(crate) stop_lat: f64,
     pub(crate) stop_lon: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) y: Option<f64>,
     pub(crate) stop_type: Option<String>,
     pub(crate) neighbour_stops: Option<Vec<NeighbourStop>>,
     pub(crate) reachable_stops: Option<Vec<String>>,
