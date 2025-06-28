@@ -67,4 +67,5 @@ pub struct Trip {
 pub struct BusStopMinimal {
     pub(crate) stop_name: String,
     pub(crate) stop_id: String,
+    pub next_stop_dist: Option<f64>,
 }

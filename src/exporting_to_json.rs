@@ -1,12 +1,12 @@
 use crate::structs;
-use crate::structs::{BusStop, NeighbourStop};
+use crate::structs::{BusStop, BusStopMinimal, NeighbourStop, Route, StopTime, Trip};
 use chrono::NaiveTime;
+use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::{error::Error, ffi::OsString, fs::File};
-use serde::{Deserialize, Serialize};
 
 pub fn creating_bus_stop_data(
     bus_stops_file_path: OsString,
@@ -23,6 +23,8 @@ pub fn creating_bus_stop_data(
         trips_file_path,
         routes_file_path,
     )?;
+
+    save_route_stop_paths(&stop_times, &trips, &routes, &bus_stops)?;
 
     let enriched_schedules = enrich_schedules(bus_schedules, &stop_times, &trips, &routes)?;
     save_bus_schedule(&enriched_schedules)?;
@@ -154,6 +156,89 @@ fn create_initial_bus_schedules(
     Ok(schedules)
 }
 
+#[derive(Debug, Serialize)]
+struct LineStops {
+    stops: Vec<BusStopMinimal>,
+}
+
+fn save_route_stop_paths(
+    stop_times: &Vec<StopTime>,
+    trips: &HashMap<String, Trip>,
+    routes: &HashMap<String, Route>,
+    stops: &HashMap<String, BusStop>,
+) -> Result<(), Box<dyn Error>> {
+    use std::collections::{BTreeMap, HashMap, HashSet};
+
+    let mut trip_stop_sequences: HashMap<String, Vec<&StopTime>> = HashMap::new();
+
+    for stop_time in stop_times {
+        trip_stop_sequences
+            .entry(stop_time.trip_id.clone())
+            .or_default()
+            .push(stop_time);
+    }
+
+    let mut route_stops: BTreeMap<String, LineStops> = BTreeMap::new();
+    let mut seen_routes: HashSet<String> = HashSet::new();
+
+    for (trip_id, mut stops_seq) in trip_stop_sequences {
+        let Some(trip) = trips.get(&trip_id) else {
+            continue;
+        };
+        let Some(route) = routes.get(&trip.route_id) else {
+            continue;
+        };
+        let line = &route.route_short_name;
+
+        if seen_routes.contains(line) {
+            continue;
+        }
+
+        stops_seq.sort_by_key(|st| st.stop_sequence);
+        let mut bus_stops = Vec::new();
+
+        for i in 0..stops_seq.len() {
+            let stop_time = stops_seq[i];
+            let stop = match stops.get(&stop_time.stop_id) {
+                Some(s) => s,
+                None => continue,
+            };
+
+            let next_stop_dist = if i + 1 < stops_seq.len() {
+                let next_stop_time = stops_seq[i + 1];
+                let next_stop = match stops.get(&next_stop_time.stop_id) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                match (stop.x, stop.y, next_stop.x, next_stop.y) {
+                    (Some(x1), Some(y1), Some(x2), Some(y2)) => {
+                        let dx = x2 - x1;
+                        let dy = y2 - y1;
+                        Some((dx * dx + dy * dy).sqrt())
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+            bus_stops.push(BusStopMinimal {
+                stop_id: stop.stop_id.clone(),
+                stop_name: stop.stop_name.clone(),
+                next_stop_dist,
+            });
+        }
+
+        route_stops.insert(line.clone(), LineStops { stops: bus_stops });
+        seen_routes.insert(line.clone());
+    }
+
+    let file = File::create("outputs/route_stop_paths.json")?;
+    serde_json::to_writer_pretty(file, &route_stops)?;
+    Ok(())
+}
+
 fn read_schedule_dependencies(
     bus_schedules: &Vec<structs::BusStopSchedule>,
     stop_times_path: OsString,
@@ -216,29 +301,29 @@ fn enrich_schedules(
     Ok(schedules)
 }
 
-fn reading_buses_schedule_json(buses_schedule_file_path: String) -> Result<(), Box<dyn Error>> {
-    let data = fs::read_to_string(buses_schedule_file_path)?;
-    let mut vehicles_paths: HashMap<String, Vec<structs::BusStopMinimal>> = HashMap::new();
-
-    let json: Vec<structs::BusStopSchedule> = serde_json::from_str(&data)?;
-    for bus_stop in json {
-        for schedule_map in bus_stop.schedules {
-            for (line_name, _) in schedule_map {
-                let entry = vehicles_paths
-                    .entry(line_name.clone())
-                    .or_insert(Vec::new());
-                let bus_stop_minimal: structs::BusStopMinimal = structs::BusStopMinimal {
-                    stop_name: bus_stop.stop_name.clone(),
-                    stop_id: bus_stop.stop_id.clone(),
-                };
-                entry.push(bus_stop_minimal);
-            }
-        }
-    }
-    println!("vehicle paths: {:?}", &vehicles_paths);
-
-    Ok(())
-}
+// fn reading_buses_schedule_json(buses_schedule_file_path: String) -> Result<(), Box<dyn Error>> {
+//     let data = fs::read_to_string(buses_schedule_file_path)?;
+//     let mut vehicles_paths: HashMap<String, Vec<structs::BusStopMinimal>> = HashMap::new();
+//
+//     let json: Vec<structs::BusStopSchedule> = serde_json::from_str(&data)?;
+//     for bus_stop in json {
+//         for schedule_map in bus_stop.schedules {
+//             for (line_name, _) in schedule_map {
+//                 let entry = vehicles_paths
+//                     .entry(line_name.clone())
+//                     .or_insert(Vec::new());
+//                 let bus_stop_minimal: structs::BusStopMinimal = structs::BusStopMinimal {
+//                     stop_name: bus_stop.stop_name.clone(),
+//                     stop_id: bus_stop.stop_id.clone(),
+//                 };
+//                 entry.push(bus_stop_minimal);
+//             }
+//         }
+//     }
+//     println!("vehicle paths: {:?}", &vehicles_paths);
+//
+//     Ok(())
+// }
 
 fn reading_routes_csv(
     routes_file_path: OsString,
@@ -387,4 +472,3 @@ fn scale_coordinates_to_gui(
     let y = ((start_lat - lat) / (start_lat - end_lat)) * height;
     (x, y)
 }
-
