@@ -1,3 +1,5 @@
+use egui::Pos2;
+
 use crate::line::{LineState, RoadSide};
 use crate::sim_consts;
 
@@ -86,12 +88,14 @@ pub enum NodeVariant {
     Stop,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub transport_variant: TransportVariant,
     pub node_variant: NodeVariant,
     pub occupied_left: bool,
     pub occupied_right: bool,
+    pub label: String,
+    pub position: Pos2,
     pub jammed: bool,
     jam_probability: f64,
     remaining_cycle_time: f64,
@@ -103,6 +107,8 @@ impl Node {
         node_variant: NodeVariant,
         occupied_left: bool,
         occupied_right: bool,
+        label: String,
+        position: Pos2,
         jam_probability: f64,
     ) -> Self {
         Self {
@@ -110,6 +116,8 @@ impl Node {
             node_variant,
             occupied_left,
             occupied_right,
+            label,
+            position,
             jammed: false,
             jam_probability,
             remaining_cycle_time: 0.0,

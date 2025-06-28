@@ -1,5 +1,5 @@
 use eframe;
-use egui::{Align2, CentralPanel, Context, Grid, SidePanel, Slider};
+use egui::{Align2, CentralPanel, Context, Grid, SidePanel, Slider, Vec2};
 
 use crate::Simulation;
 
@@ -35,6 +35,7 @@ impl eframe::App for Simulation {
         CentralPanel::default().show(ctx, |ui| {
             let visuals = self.graph.generate_visuals();
             let painter = ui.painter_at(ui.max_rect());
+
             for node in visuals.nodes {
                 painter.circle_filled(node.position, NODE_RADIUS, node.color);
                 painter.text(
@@ -42,7 +43,15 @@ impl eframe::App for Simulation {
                     Align2::CENTER_CENTER,
                     &node.text,
                     egui::FontId::proportional(14.0),
-                    egui::Color32::BLACK,
+                    egui::Color32::WHITE,
+                );
+
+                painter.text(
+                    node.position + Vec2 { x: 0.0, y: -40.0 },
+                    Align2::CENTER_CENTER,
+                    &node.label,
+                    egui::FontId::proportional(16.0),
+                    egui::Color32::WHITE,
                 );
             }
             // for edge in &self.edges {

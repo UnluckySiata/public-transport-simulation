@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use egui::Pos2;
-
 use crate::{
-    line::RoadSide, map::{MapNode, Visuals}, node::{Node, NodeVariant, Vehicle}, time::Time
+    line::RoadSide,
+    map::{MapNode, Visuals},
+    node::{Node, NodeVariant, Vehicle},
+    time::Time,
 };
 
 #[derive(Debug)]
@@ -103,9 +104,15 @@ impl Graph {
                 0
             };
 
-            let pos = Pos2 { x: 400.0 + (i as f32) * 80.0, y: 200.0 };
-
-            let map_node = MapNode::new(pos, node.jammed, node.transport_variant, vehicle_line_left, vehicle_line_right);
+            let map_node = MapNode::new(
+                node.position,
+                node.jammed,
+                node.transport_variant,
+                node.node_variant,
+                vehicle_line_left,
+                vehicle_line_right,
+                node.label.clone(),
+            );
             map_nodes.push(map_node);
         }
 

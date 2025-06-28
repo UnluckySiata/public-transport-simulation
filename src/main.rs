@@ -1,14 +1,14 @@
 #![allow(dead_code)]
+mod data;
 mod graph;
 mod gui;
 mod line;
 mod map;
-mod mock;
 mod node;
 mod sim_consts;
 mod time;
 
-use crate::{graph::Graph, mock::mock_one_line, time::Time};
+use crate::{data::create_graph, graph::Graph, time::Time};
 
 pub struct Simulation {
     pub accumulator: f64,
@@ -21,7 +21,7 @@ pub struct Simulation {
 }
 
 fn run_simulation() -> eframe::Result<()> {
-    let graph = mock_one_line();
+    let graph = create_graph();
 
     let sim = Simulation {
         accumulator: 0.0,
