@@ -3,28 +3,23 @@ use std::collections::HashMap;
 use crate::{
     line::RoadSide,
     node::{Node, NodeVariant, Vehicle},
+    time::Time,
 };
 
 #[derive(Debug)]
 pub struct Graph {
     n: usize,
     vehicles: HashMap<(usize, RoadSide), Vehicle>,
-    initial_nodes: Vec<Node>,
     nodes: Vec<Node>,
 }
 
 impl Graph {
     pub fn new(nodes: Vec<Node>, vehicles: HashMap<(usize, RoadSide), Vehicle>) -> Self {
         let n = nodes.len();
-        Self {
-            n,
-            vehicles,
-            initial_nodes: nodes.clone(),
-            nodes,
-        }
+        Self { n, vehicles, nodes }
     }
 
-    pub fn simulation_iter(&mut self, elapsed_time: f64) {
+    pub fn simulation_iter(&mut self, elapsed_time: f64, _sim_time: &Time) {
         for node in self.nodes.iter_mut() {
             if let NodeVariant::TrafficLights(traffic_lights) = &mut node.node_variant {
                 traffic_lights.iter_and_change(elapsed_time);

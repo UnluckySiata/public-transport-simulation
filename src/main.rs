@@ -3,12 +3,14 @@ mod graph;
 mod line;
 mod map;
 mod mock;
+mod time;
 mod node;
 mod sim_consts;
 
 use std::time::Instant;
 
 use mock::mock_one_line;
+use time::Time;
 
 fn simulation_loop() {
     let mut accumulator: f64 = 0.0;
@@ -18,6 +20,7 @@ fn simulation_loop() {
     let mut graph = mock_one_line();
 
     let time_step = sim_consts::SIM_SPEED_MULTIPLIER * sim_consts::FIXED_DT;
+    let sim_time = Time::new(4, 30, 0);
 
     loop {
         let now = Instant::now();
@@ -32,7 +35,7 @@ fn simulation_loop() {
 
         while accumulator >= sim_consts::FIXED_DT {
             accumulator -= sim_consts::FIXED_DT;
-            graph.simulation_iter(time_step);
+            graph.simulation_iter(time_step, &sim_time);
             // println!("ft: {frame_time}");
         }
 
